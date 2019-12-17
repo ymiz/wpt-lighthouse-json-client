@@ -7,5 +7,5 @@ func main() {
 	//	log.Println("error", err)
 	//	return
 	//}
-	//log.Println("result: score", result.Performance.Score)
+	//log.Println("result: score", result.Performance.Score, "url", result.Url)
 }

@@ -3,7 +3,6 @@ package wpt_lighthouse_json_client
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -23,8 +22,8 @@ func (c Client) GetLighthouseResult(params Params) (*Result, error) {
 	q.Set("test", params.TestId)
 	q.Set("f", "json")
 	u.RawQuery = q.Encode()
-	log.Println(u.String())
-	resp, err := http.Get(u.String())
+	jsonUrl := u.String()
+	resp, err := http.Get(jsonUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +42,53 @@ func (c Client) GetLighthouseResult(params Params) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	score := tempResult.(map[string]interface{})["categories"].(map[string]interface{})["performance"].(map[string]interface{})["score"].(float64)
-	result.StatusCode = 200
-	result.Performance.Score = score
-	return &result, nil
+	return c.parseResult(tempResult, jsonUrl)
+}
+
+func (c Client) parseResult(jsonResult interface{}, jsonUrl string) (*Result, error) {
+	a, ok := jsonResult.(map[string]interface{})
+	if !ok {
+		return nil, ParseError{Message: "top level parse;"}
+	}
+	categories, ok := a["categories"]
+	if !ok {
+		return nil, ParseError{Message: "no categories;"}
+	}
+	castedCategories, ok := categories.(map[string]interface{})
+	if !ok {
+		return nil, ParseError{Message: "fail cast categories"}
+	}
+	performance, ok := castedCategories["performance"]
+	if !ok {
+		return nil, ParseError{Message: "no performance;"}
+	}
+	castedPerformance, ok := performance.(map[string]interface{})
+	if !ok {
+		return nil, ParseError{Message: "fail cast performance;"}
+	}
+	score, ok := castedPerformance["score"]
+	if !ok {
+		return nil, ParseError{Message: "no score;"}
+	}
+	castedScore, ok := score.(float64)
+	if !ok {
+		return nil, ParseError{Message: "fail cast score;"}
+	}
+	return &Result{
+		Url:        jsonUrl,
+		StatusCode: 200,
+		Performance: Performance{
+			Score: castedScore,
+		},
+	}, nil
+}
+
+type ParseError struct {
+	Message string
+}
+
+func (p ParseError) Error() string {
+	return "lighthouse result parse error; " + p.Message
 }
 
 type Params struct {
